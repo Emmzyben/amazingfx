@@ -1,0 +1,290 @@
+<!-- <?php
+session_start();
+require_once './database/db_config.php';
+require_once './vendor/autoload.php';
+require_once 'secret.php';
+
+use Stripe\Stripe;
+use Stripe\Checkout\Session as CheckoutSession;
+
+// Function to fetch specific exchange rates
+function convertCurrency($amount, $currency)
+{
+    $apiKey = "8ff50e81c6424de1bf5f02394f380222"; // Replace with your actual API key
+    $supportedCurrencies = ['USD', 'EUR', 'GBP']; // Add more as needed
+
+    if (!in_array($currency, $supportedCurrencies)) {
+        return false; // Unsupported currency
+    }
+
+    $apiUrl = "https://api.currencyfreaks.com/v2.0/rates/latest?apikey=$apiKey&symbols=" . implode(',', $supportedCurrencies);
+    
+    $response = file_get_contents($apiUrl);
+    if ($response === FALSE) {
+        return false;
+    }
+
+    $data = json_decode($response, true);
+    if (!isset($data['rates'][$currency])) {
+        return false;
+    }
+
+    $exchangeRate = floatval($data['rates'][$currency]);
+    return round($amount * $exchangeRate, 2); // Convert and round the amount
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name = htmlspecialchars(trim($_POST['name']));
+    $email = htmlspecialchars(trim($_POST['email']));
+    $plan = htmlspecialchars(trim($_POST['plan']));
+    $location = htmlspecialchars(trim($_POST['location']));
+    $currency = htmlspecialchars(trim($_POST['currency']));
+
+    if (empty($name) || empty($email) || empty($plan) || empty($currency)) {
+        $_SESSION['message'] = "All fields are required.";
+        $_SESSION['messageType'] = "error";
+        header("Location: pay.php");
+        exit;
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $_SESSION['message'] = "Invalid email format.";
+        $_SESSION['messageType'] = "error";
+        header("Location: pay.php");
+        exit;
+    } 
+
+  
+    // Convert plan amount to selected currency
+    $convertedAmount = convertCurrency($plan, $currency);
+    if ($convertedAmount === false) {
+        $_SESSION['message'] = "Error fetching exchange rate or unsupported currency.";
+        $_SESSION['messageType'] = "error";
+        header("Location: pay.php");
+        exit;
+    }
+
+    // Encode user data
+    $userData = base64_encode(json_encode([
+        'name' => $name,
+        'email' => $email,
+        'location' => $location,
+        'plan' => $plan,
+    ]));
+
+    Stripe::setApiKey($stripeSecretKey);
+    $YOUR_DOMAIN = 'http://localhost/zlory';
+
+    try {
+        $checkout_session = CheckoutSession::create([
+            'line_items' => [[
+                'price_data' => [
+                    'currency' => strtolower($currency),
+                    'product_data' => ['name' => "Plan Subscription"],
+                    'unit_amount' => intval($convertedAmount * 100), // Convert to cents
+                ],
+                'quantity' => 1,
+            ]],
+            'mode' => 'payment',
+            'success_url' => "$YOUR_DOMAIN/success.php?data=$userData",
+            'cancel_url' => "$YOUR_DOMAIN/cancel.html",
+        ]);
+
+        header("Location: " . $checkout_session->url);
+        exit;
+    } catch (Exception $e) {
+        $_SESSION['message'] = "Error creating payment session: " . $e->getMessage();
+        $_SESSION['messageType'] = "error";
+        header("Location: pay.php");
+        exit;
+    }
+}
+
+// Show notification messages in pay.php
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $messageType = $_SESSION['messageType'];
+    unset($_SESSION['message']);
+    unset($_SESSION['messageType']);
+}
+?> -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Amazing fx</title>
+  <meta name="description" content="">
+  <meta name="keywords" content="">
+
+  <!-- Favicons -->
+  <!-- <link href="assets/img/favicon.png" rel="icon">
+  <link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon"> -->
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Raleway:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/vendor/aos/aos.css" rel="stylesheet">
+  <link href="assets/vendor/swiper/swiper-bundle.min.css" rel="stylesheet">
+  <link href="assets/vendor/glightbox/css/glightbox.min.css" rel="stylesheet">
+
+  <!-- Main CSS File -->
+  <link href="assets/css/main.css" rel="stylesheet">
+
+  <!-- =======================================================
+  * Template Name: Gp
+  * Template URL: https://bootstrapmade.com/gp-free-multipurpose-html-bootstrap-template/
+  * Updated: Aug 15 2024 with Bootstrap v5.3.3
+  * Author: BootstrapMade.com
+  * License: https://bootstrapmade.com/license/
+  ======================================================== -->
+</head>
+
+<body class="index-page">
+
+  <header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container-fluid container-xl position-relative d-flex align-items-center justify-content-between">
+
+      <a href="index.html" class="logo d-flex align-items-center me-auto me-lg-0">
+        <!-- Uncomment the line below if you also wish to use an image logo -->
+        <!-- <img src="assets/img/logo.png" alt=""> -->
+        <h1 class="sitename">AmazingFx365</h1>
+        <span>.</span>
+      </a>
+
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li><a href="index.html" >Home<br></a></li>
+          <li><a href="index.html">About</a></li>
+          <li><a href="index.html">Services</a></li>
+          <li><a href="prices.html">Pricing</a></li>
+          <li><a href="index.html">Contact Us</a></li>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
+
+      <a class="btn-getstarted" href="prices.html">Get Started</a>
+
+    </div>
+  </header>
+
+<!-- content -->
+
+
+
+
+<div style="display: flex;align-items: center;justify-content: center;">
+<!-- <?php
+if (!empty($message)) {
+    echo '<div id="notificationBar" class="notification-bar notification-' . $messageType . '">';
+    echo $message;
+    echo '<span class="close-btn" onclick="closeNotification()">&times;</span>';
+    echo '</div>';
+}
+?> -->
+<div style="height: auto;text-align: center;padding: 30px;border: 1px solid rgb(192, 190, 190);width: 400px;margin: 20px;border-radius: 5px;margin-top: 90px;">
+   
+<h3 style="color:goldenrod;">Fill the Form to Proceed</h3>
+<form action="" method="post">
+  <input type="text" name="name" placeholder="Your Name" class="form-control"><br>
+  <input type="text" name="location" placeholder="Your Location" class="form-control"><br>
+    <input type="email" name="email" placeholder="Your Email" class="form-control"><br>
+   <select name="plan" class="form-control">
+    <option value="">Select Plan</option>
+    <option value="99">Basic</option>
+    <option value="199">Standard</option>
+    <option value="399">Premium</option>
+   </select><br>
+   <select name="currency" class="form-control">
+    <option value="">Select Currency</option>
+    <option value="GBP">GBP</option>
+    <option value="EUR">EUR</option>
+    <option value="USD">USD</option>
+   </select><br>
+    <button type="submit" class="btn btn-primary">Proceed to payment</button>
+</form>
+</div>
+</div>
+
+
+
+
+
+<footer id="footer" class="footer dark-background">
+
+<div class="footer-top">
+  <div class="container">
+    <div class="row gy-4">
+      <div class="col-lg-4 col-md-6 footer-about">
+        <a href="index.html" class="logo d-flex align-items-center">
+          <span class="sitename">AmazingFx365</span>
+        </a>
+        <div class="footer-contact pt-3">
+          <p>117 Constitution Road Chatham ME5 7DW Kent</p>
+          <p class="mt-3"><strong>Phone:</strong> <span>+44 7398 313362</span></p>
+          <p class="mt-3"><strong>Company Reg number:</strong> <span>07803084</span></p>
+          <p><strong>Email:</strong> <span>Hello@crownworldltd.com</span></p>
+        </div>
+      </div>
+
+      <div class="col-lg-4 col-md-3 footer-links">
+        <h4>Useful Links</h4>
+        <ul>
+          <li><i class="bi bi-chevron-right"></i> <a href="#"> Home</a></li>
+          <li><i class="bi bi-chevron-right"></i> <a href="#"> About us</a></li>
+          <li><i class="bi bi-chevron-right"></i> <a href="#"> Services</a></li>
+        </ul>
+      </div>
+
+      <div class="col-lg-4 col-md-3 footer-links">
+        <h4>Our Services</h4>
+        <ul>
+          <li><i class="bi bi-chevron-right"></i> <a href="#">Live Trading Sessions</a></li>
+          <li><i class="bi bi-chevron-right"></i> <a href="#">Trader Subscriptions</a></li>
+          <li><i class="bi bi-chevron-right"></i> <a href="#">Forex Mentorship</a></li>
+        </ul>
+      </div>
+
+    
+
+    </div>
+  </div>
+</div>
+
+<div class="copyright">
+  <div class="container text-center">
+    <p>© <span>Copyright </span> <strong class="px-1 sitename">AmazingFx365</strong> <span>All Rights Reserved</span></p>
+    <div class="credits">
+   </div>
+  </div>
+</div>
+
+</footer>
+
+<!-- Scroll Top -->
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+<!-- Preloader -->
+<div id="preloader"></div>
+
+<!-- Vendor JS Files -->
+<script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="assets/vendor/php-email-form/validate.js"></script>
+<script src="assets/vendor/aos/aos.js"></script>
+<script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+<script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
+<script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
+<script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
+<script src="assets/vendor/purecounter/purecounter_vanilla.js"></script>
+
+<!-- Main JS File -->
+<script src="assets/js/main.js"></script>
+
+</body>
+
+</html>
